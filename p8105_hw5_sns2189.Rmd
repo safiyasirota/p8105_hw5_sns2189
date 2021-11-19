@@ -1,7 +1,7 @@
 ---
 title: "Homework 5"
 author: "Safiya Sirota"
-date:  2021-10-20
+date:  2021-11-20
 output: 
   github_document:
     toc: TRUE
@@ -11,8 +11,6 @@ output:
 library(tidyverse)
 library(patchwork)
 library(p8105.datasets)
-  data("instacart")
-  data("brfss_smart2010")
 
 knitr::opts_chunk$set(
   fig.width = 6,
@@ -135,12 +133,70 @@ results_df %>%
 
 ## Problem 2
 
-```{r}
-tibble(
-  files = list.files("./data/zip_data")
-)
+Start with a dataframe containing all file names; the list.files function will help
 
+Iterate over file names and read in data for each subject using purrr::map and saving the result as a new variable in the dataframe
+
+Tidy the result; manipulate file names to include control arm and subject ID, make sure weekly observations are “tidy”, and do any other tidying that’s necessary
+
+```{r}
+#list of filenames
+files_df <-
+  tibble(
+    file = list.files("./data/zip_data")
+  )
+
+#making function
+read_file <-
+  function(filename) {
+    
+    subject_df <-
+      read_csv(str_c("./data/zip_data/", filename))
+    
+    return(subject_df)
+  }
+
+#reading in data
+experiment_df <- 
+  files_df %>% 
+    mutate(
+      subj_data = map(file, read_file)
+    )
+
+#tidying data
+experiment_df <-
+  experiment_df %>% 
+  unnest(subj_data) %>% 
+  mutate(
+    arm = as.factor(
+      case_when(
+      str_starts(file, "con") ~ "control",
+      TRUE ~ "experimental"
+      )
+    ),
+    subject_n = case_when(
+      arm == "control" ~ as.numeric((str_sub(file, 5, 6))),
+      TRUE ~ as.numeric((str_sub(file, 5, 6))) + 10
+    )
+  ) %>% 
+  select(-file) %>% 
+  relocate(subject_n, arm) %>% 
+  pivot_longer(
+    week_1:week_8,
+    names_to = "week",
+    values_to = "value",
+    names_prefix = "week_"
+  )
 ```
+
+__Making spaghetti plot__
+
+```{r}
+experiment_df %>% 
+  ggplot(aes(x = week, y = value, group = as.factor(subject_n), color = arm)) +
+  geom_line()
+```
+
 
 ## Problem 3
 
